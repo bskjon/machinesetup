@@ -16,7 +16,7 @@ done
 
 install_dependencies() {
     echo "Installerer nødvendige avhengigheter..."
-    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd, 7z, tar)
+    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd 7z tar kdeconnect)
     for PACKAGE in "${REQUIRED_PACKAGES[@]}"; do
         if ! dpkg -l | grep -qw "$PACKAGE"; then
             echo "Installerer $PACKAGE..."
