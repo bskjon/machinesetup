@@ -17,7 +17,7 @@ until echo "$password" | sudo -S -v &>/dev/null; do
     read -s -p "[sudo] password for $USER: " password
     echo
 done
-\# Hjelpefunksjon for sudo med passord
+# Hjelpefunksjon for sudo med passord
 sudo_pass() {
     echo "$password" | sudo -S "$@"
 }
