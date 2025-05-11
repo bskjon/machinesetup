@@ -199,7 +199,7 @@ configure_refind() {
     # Pakk ut ambience.tar.gz dersom den finnes i den nåværende mappen
     if [ -f "ambience.tar.gz" ]; then
          echo "Pakker ut ambience.tar.gz til $CONFIG_DIR/themes/ambience..."
-         echo "$password" | sudo -S tar -xzvf ambience.tar.gz -C "$CONFIG_DIR/themes/ambience"
+         echo "$password" | sudo -S tar --no-same-owner -xzvf ambience.tar.gz -C "$CONFIG_DIR/themes/ambience"
     else
          echo "Filen ambience.tar.gz ikke funnet. Hoppet over opplasting av theme."
     fi
