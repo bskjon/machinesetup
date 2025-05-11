@@ -6,30 +6,27 @@
 export DEBIAN_FRONTEND=noninteractive
 APT_ARGS=("-y" "-qq")
 
-# Fjern automatisk exit på feil, vi håndterer det selv
-set -uo pipefail
+# Avbryt skriptet ved feil, udefinerte variabler og sett pipefail
+set -euo pipefail
 
 # Les sudo-passordet én gang
-default_prompt() { echo "[sudo] password for $USER: "; }
-
-read -s -p "$(default_prompt)" password
+read -s -p "[sudo] password for $USER: " password
 echo
 until echo "$password" | sudo -S -v &>/dev/null; do
     echo "Ugyldig passord, prøv igjen."
-    read -s -p "$(default_prompt)" password
+    read -s -p "[sudo] password for $USER: " password
     echo
 done
-
-# Hjelpefunksjon for sudo med passord
+\# Hjelpefunksjon for sudo med passord
 sudo_pass() {
     echo "$password" | sudo -S "$@"
 }
 
-# Array for logging av funksjoner som feilet av funksjoner som feilet
+# Array for logging av funksjoner som feilet
 declare -a FAILURES=()
 
-# Sjekk om funksjon feiler, legg til i FAILURES
-def run_step() {
+# Kjører en funksjon, logger eventuelle feil
+run_step() {
     local fn="$1"
     echo "=== Kjører: $fn ==="
     if ! $fn; then
@@ -40,41 +37,46 @@ def run_step() {
 
 # Funksjoner
 install_dependencies() {
-    sudo_pass apt-get update "${APT_ARGS[@]}"
+    # Kun stille oppdatering
+    sudo_pass apt-get update -qq
     sudo_pass apt-get upgrade "${APT_ARGS[@]}"
+
     for pkg in git wget jq dconf-cli curl snapd p7zip-full tar kdeconnect; do
         if ! dpkg -l | grep -qw "$pkg"; then
-            sudo_pass apt-get install "${APT_ARGS[@]}" "$pkg" || return 1
+            sudo_pass apt-get install "${APT_ARGS[@]}" "$pkg"
         fi
     done
 }
 
 install_fzf() {
     if ! command -v fzf &>/dev/null; then
-        sudo_pass apt-get install "${APT_ARGS[@]}" fzf || return 1
+        sudo_pass apt-get install "${APT_ARGS[@]}" fzf
         echo 'eval "$(fzf --bash)"' >> "$HOME/.bashrc"
     fi
 }
 
 install_edge() {
     local base="https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/"
-    local latest=$(curl -s "$base" \
+    local latest
+    latest=$(curl -s "$base" \
         | grep -oP 'microsoft-edge-stable_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-1_amd64.deb' \
         | sort -V | tail -n1)
-    if [[ -z "$latest" ]]; then return 1; fi
+    if [[ -z "$latest" ]]; then
+        return 1
+    fi
     wget -q "$base$latest"
     sudo_pass dpkg -i "$latest" || sudo_pass apt-get install -f "${APT_ARGS[@]}"
 }
 
 install_snap() {
-    sudo_pass apt-get install "${APT_ARGS[@]}" snapd || return 1
+    sudo_pass apt-get install "${APT_ARGS[@]}" snapd
 }
 
 install_apps_from_app_center() {
-    sudo_pass snap install intellij-idea-community --classic || return 1
-    sudo_pass snap install android-studio --classic || return 1
-    sudo_pass snap install discord || return 1
-    sudo_pass snap install spotify || return 1
+    sudo_pass snap install intellij-idea-community --classic
+    sudo_pass snap install android-studio --classic
+    sudo_pass snap install discord
+    sudo_pass snap install spotify
 }
 
 install_steam() {
@@ -85,49 +87,54 @@ install_steam() {
 install_wine() {
     if ! dpkg -l | grep -qw wine; then
         sudo_pass dpkg --add-architecture i386
-        sudo_pass apt-get update "${APT_ARGS[@]}"
-        sudo_pass apt-get install "${APT_ARGS[@]}" wine64 wine32 winetricks || return 1
+        sudo_pass apt-get update -qq
+        sudo_pass apt-get install "${APT_ARGS[@]}" wine64 wine32 winetricks
     fi
 }
 
 install_flatpak() {
     if ! command -v flatpak &>/dev/null; then
-        sudo_pass apt-get install "${APT_ARGS[@]}" flatpak || return 1
+        sudo_pass apt-get install "${APT_ARGS[@]}" flatpak
         sudo_pass flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     fi
 }
 
 install_gear_lever() {
-    if ! command -v flatpak &>/dev/null; then return 1; fi
-    sudo_pass flatpak install -y flathub it.mijorus.gearlever || return 1
+    if ! command -v flatpak &>/dev/null; then
+        return 1
+    fi
+    sudo_pass flatpak install -y flathub it.mijorus.gearlever
 }
 
 install_refind() {
     sudo_pass add-apt-repository ppa:rodsmith/refind -y
-    sudo_pass apt-get update "${APT_ARGS[@]}"
-    sudo_pass apt-get install "${APT_ARGS[@]}" refind || return 1
+    sudo_pass apt-get update -qq
+    sudo_pass apt-get install "${APT_ARGS[@]}" refind
 }
 
 install_cooler_control() {
     local api="https://gitlab.com/api/v4/projects/30707566/releases"
-    local version=$(curl -s "$api" | jq -r '.[0].tag_name')
-    if [[ -z "$version" ]]; then return 1; fi
+    local version
+    version=$(curl -s "$api" | jq -r '.[0].tag_name')
+    if [[ -z "$version" ]]; then
+        return 1
+    fi
     for f in coolercontrol_${version}_amd64_ubuntu.deb \
              coolercontrold_${version}_amd64_ubuntu.deb \
              coolercontrol-liqctld_${version}_amd64_ubuntu.deb; do
-        wget -qO "$f" "https://gitlab.com/coolercontrol/coolercontrol/-/releases/$version/downloads/packages/$f" || return 1
+        wget -qO "$f" "https://gitlab.com/coolercontrol/coolercontrol/-/releases/$version/downloads/packages/$f"
     done
 }
 
 extract_coolercontrol() {
     if [[ -f "coolercontro.tar.gz" ]]; then
         sudo_pass mkdir -p /etc/coolercontrol
-        sudo_pass tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol || return 1
+        sudo_pass tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol
     fi
 }
 
 configure_refind() {
-    local cfg=/boot/efi/EFI/refind/refind.conf
+    local cfg="/boot/efi/EFI/refind/refind.conf"
     [[ -f "$cfg" ]] || return 1
     sudo_pass mkdir -p /boot/efi/EFI/refind/themes/ambience
     [[ -f ambience.tar.gz ]] && sudo_pass tar -xzvf ambience.tar.gz -C /boot/efi/EFI/refind/themes/ambience
@@ -145,17 +152,18 @@ configure_refind() {
 }
 
 configure_theme() {
-    [[ -f gnome-settings.dconf ]] && dconf load / < gnome-settings.dconf || return 1
+    [[ -f gnome-settings.dconf ]] && dconf load / < gnome-settings.dconf
 }
 
 configure_extensions() {
     if [[ -f gnome-extensions-backup.tar.gz ]]; then
         mkdir -p "$HOME/.local/share/gnome-shell/extensions"
-        tar -xzf gnome-extensions-backup.tar.gz -C "$HOME/.local/share/gnome-shell/extensions" || return 1
+        tar -xzf gnome-extensions-backup.tar.gz -C "$HOME/.local/share/gnome-shell/extensions"
         dconf load /org/gnome/shell/extensions/ < gnome-extensions-settings.dconf
     fi
 }
 
+# Hovedkjøring
 main() {
     local steps=(
         install_dependencies
