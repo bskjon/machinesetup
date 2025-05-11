@@ -21,9 +21,11 @@ until echo "$password" | sudo -S -v &>/dev/null; do
 done
 
 # Hjelpefunksjon for sudo med passord
-def sudo_pass() { echo "$password" | sudo -S "$@"; }
+sudo_pass() {
+    echo "$password" | sudo -S "$@"
+}
 
-# Array for logging av funksjoner som feilet
+# Array for logging av funksjoner som feilet av funksjoner som feilet
 declare -a FAILURES=()
 
 # Sjekk om funksjon feiler, legg til i FAILURES
