@@ -14,6 +14,25 @@ done
 # INSTALLASJONSFUNKSJONER  #
 #############################
 
+install_dependencies() {
+    echo "Installerer nødvendige avhengigheter..."
+    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd, 7z, tar)
+    for PACKAGE in "${REQUIRED_PACKAGES[@]}"; do
+        if ! dpkg -l | grep -qw "$PACKAGE"; then
+            echo "Installerer $PACKAGE..."
+            echo "$password" | sudo -S apt install -y "$PACKAGE"
+        else
+            echo "$PACKAGE er allerede installert."
+        fi
+    done
+}
+
+# ... (de øvrige installasjons- og konfigurasjonsfunksjonene)
+
+#############################
+# INSTALLASJONSFUNKSJONER  #
+#############################
+
 # Installerer fzf og legger til initialisering i .bashrc
 install_fzf() {
     echo "Installerer fzf..."
@@ -66,6 +85,23 @@ install_steam() {
     echo "Installerer Steam..."
     echo "$password" | sudo -S dpkg -i steam_latest.deb || echo "$password" | sudo -S apt install -f -y
 }
+
+install_wine() {
+    echo "Installerer Wine..."
+
+    # Sjekker om Wine allerede er installert
+    if dpkg -l | grep -qw wine; then
+        echo "Wine er allerede installert!"
+        return
+    fi
+
+    # Legg til Wine PPA repository og oppdater pakker
+    echo "$password" | sudo -S dpkg --add-architecture i386
+    echo "$password" | sudo -S apt update
+    echo "$password" | sudo -S apt install -y wine64 wine32 winetricks
+    echo "Wine er nå installert!"
+}
+
 
 # Installerer rEFInd
 install_refind() {
@@ -191,6 +227,8 @@ configure_extensions() {
 # HOVEDFUNKSJONEN  #
 #####################
 main() {
+    install_dependencies  # Installerer nødvendige pakker først
+
     # Kloner repository dersom den ikke allerede eksisterer, og bytt til mappen
     if [ ! -d "machinesetup" ]; then
          echo "Kloner repository..."
@@ -206,6 +244,7 @@ main() {
     install_apps_from_app_center
     install_steam
     install_refind
+    install_wine
 
     # Konfigurer rEFInd med tema og resolution-oppdateringer
     configure_refind
