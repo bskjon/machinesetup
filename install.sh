@@ -173,15 +173,15 @@ install_cooler_control() {
 }
 
 
-# Pakker ut coolercontro.tar.gz til /etc/coolercontrol
+# Pakker ut coolercontrol.tar.gz til /etc/coolercontrol
 extract_coolercontrol() {
     if [ -f "coolercontrol.tar.gz" ]; then
          echo "Pakker ut coolercontrol.tar.gz til /etc/coolercontrol..."
          echo "$password" | sudo -S mkdir -p /etc/coolercontrol
-         echo "$password" | sudo -S tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol
+         echo "$password" | sudo -S tar -xzvf coolercontrol.tar.gz -C /etc/coolercontrol
          echo "Pakking ferdig!"
     else
-         echo "Filen coolercontro.tar.gz ikke funnet. Hoppet over utpakking."
+         echo "Filen coolercontrol.tar.gz ikke funnet. Hoppet over utpakking."
     fi
 }
 
