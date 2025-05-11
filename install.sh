@@ -21,7 +21,7 @@ install_dependencies() {
     echo "Installerer nødvendige avhengigheter..."
     echo "$password" | sudo -S apt update -y -qq
     echo "$password" | sudo -S apt upgrade -y -qq
-    echo "$password" | sudo -S apt -y -qq git wget jq dconf-cli tar curl snapd 7zip tar kdeconnect
+    echo "$password" | sudo -S apt -y -qq wget git jq dconf-cli tar curl snapd 7zip tar kdeconnect
 }
 
 # ... (de øvrige installasjons- og konfigurasjonsfunksjonene)
