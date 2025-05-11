@@ -218,6 +218,8 @@ configure_extensions() {
         
         echo "Pakker ut GNOME-extensions fra $BACKUP_FILE..."
         tar -xvzf "$BACKUP_FILE" -C "$EXT_DIR"
+        dconf load /org/gnome/shell/extensions/ < gnome-extensions-settings.dconf
+
     else
         echo "Feil: Filen $BACKUP_FILE ble ikke funnet."
     fi
