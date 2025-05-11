@@ -18,7 +18,7 @@ install_dependencies() {
     echo "Installerer nødvendige avhengigheter..."
     echo "$password" | sudo -S apt update -y 
     echo "$password" | sudo -S apt upgrade -y
-    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd 7z tar kdeconnect)
+    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd 7zip tar kdeconnect)
     for PACKAGE in "${REQUIRED_PACKAGES[@]}"; do
         if ! dpkg -l | grep -qw "$PACKAGE"; then
             echo "Installerer $PACKAGE..."
