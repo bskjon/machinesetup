@@ -102,6 +102,40 @@ install_wine() {
     echo "Wine er nå installert!"
 }
 
+install_flatpak() {
+    echo "Installerer Flatpak..."
+
+    # Sjekk om Flatpak allerede er installert
+    if command -v flatpak &> /dev/null; then
+        echo "Flatpak er allerede installert!"
+        return
+    fi
+
+    # Installer Flatpak via APT
+    echo "$password" | sudo -S apt install -y flatpak
+
+    # Legg til Flathub repo hvis det ikke allerede er lagt til
+    echo "$password" | sudo -S flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+    echo "Flatpak er nå installert!"
+}
+
+install_gear_lever() {
+    echo "Installerer Gear Lever via Flatpak..."
+
+    # Sjekk om Flatpak er installert
+    if ! command -v flatpak &> /dev/null; then
+        echo "Flatpak ble ikke funnet! Installering av Gear Lever kan ikke fortsette."
+        return
+    fi
+
+    # Legg til Flathub repo hvis det ikke allerede er lagt til
+    echo "$password" | sudo -S flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+    # Installer Gear Lever
+    echo "$password" | sudo -S flatpak install -y flathub com.github.unrud.GearLever
+}
+
 
 # Installerer rEFInd
 install_refind() {
@@ -247,7 +281,8 @@ main() {
     install_steam
     install_refind
     install_wine
-
+    install_flatpak
+    install_gear_lever
     # Konfigurer rEFInd med tema og resolution-oppdateringer
     configure_refind
 
