@@ -1,280 +1,181 @@
 #!/bin/bash
-set -e  # Avslutt scriptet ved feil
+set -euo pipefail  # Avslutt scriptet ved feil, udefinerte variabler eller rør-feil
+
+# Ikke-interaktiv installasjon
+export DEBIAN_FRONTEND=noninteractive
+APT_ARGS=("-y" "-qq" "-o" "Dpkg::Options::=--force-confdef" "-o" "Dpkg::Options::=--force-confold")
 
 # Les inn sudo-passordet én gang
 read -s -p "[sudo] password for $USER: " password
 echo
 until echo "$password" | sudo -S -v &>/dev/null; do
-    echo "Sorry, prøv igjen."
+    echo "Ugyldig passord, prøv igjen."
     read -s -p "[sudo] password for $USER: " password
     echo
 done
+
+# Hjelpefunksjon for sudo-kommandoer med passord
+sudo_pass() {
+    echo "$password" | sudo -S "$@"
+}
 
 #############################
 # INSTALLASJONSFUNKSJONER  #
 #############################
 
 install_dependencies() {
-    echo "Installerer nødvendige avhengigheter..."
-    echo "$password" | sudo -S apt update -y 
-    echo "$password" | sudo -S apt upgrade -y
-    REQUIRED_PACKAGES=(git wget jq dconf-cli tar curl snapd 7zip tar kdeconnect)
-    for PACKAGE in "${REQUIRED_PACKAGES[@]}"; do
-        if ! dpkg -l | grep -qw "$PACKAGE"; then
-            echo "Installerer $PACKAGE..."
-            echo "$password" | sudo -S apt install -y "$PACKAGE"
-        else
-            echo "$PACKAGE er allerede installert."
-        fi
-    done
+    echo "Oppdaterer pakkelister og oppgraderer installerte pakker..."
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get upgrade "${APT_ARGS[@]}"
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" git wget jq dconf-cli curl snapd p7zip-full tar kdeconnect
 }
 
-# ... (de øvrige installasjons- og konfigurasjonsfunksjonene)
-
-#############################
-# INSTALLASJONSFUNKSJONER  #
-#############################
-
-# Installerer fzf og legger til initialisering i .bashrc
 install_fzf() {
     echo "Installerer fzf..."
-    echo "$password" | sudo -S apt install -y fzf
-    if ! grep -q 'fzf --bash' "$HOME/.bashrc"; then
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" fzf
+    grep -qxF 'eval "$(fzf --bash)"' "$HOME/.bashrc" || \
         echo 'eval "$(fzf --bash)"' >> "$HOME/.bashrc"
-    fi
 }
 
-# Installerer Microsoft Edge ved å hente den siste .deb-filen
 install_edge() {
     echo "Installerer Microsoft Edge..."
-    EDGE_URL="https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/"
-    LATEST_DEB=$(curl -s "$EDGE_URL" | grep -oP 'microsoft-edge-stable_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' | sort -V | tail -n 1)
-    if [ -n "$LATEST_DEB" ]; then
-         echo "Laster ned $LATEST_DEB..."
-         wget "$EDGE_URL$LATEST_DEB"
-         echo "Installerer $LATEST_DEB..."
-         echo "$password" | sudo -S dpkg -i "$LATEST_DEB"
-         echo "$password" | sudo -S apt-get -f install -y
-         echo "Microsoft Edge er nå installert!"
+    local base="https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/"
+    local latest=$(curl -s "$base" \
+        | grep -oP 'microsoft-edge-stable_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-1_amd64.deb' \
+        | sort -V | tail -n1)
+    if [[ -n "$latest" ]]; then
+        echo "Laster ned $latest..."
+        wget -q "$base$latest"
+        echo "Installerer $latest..."
+        sudo_pass dpkg -i "$latest" || sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" -f
     else
-         echo "Kunne ikke finne siste versjon av Microsoft Edge."
+        echo "Kunne ikke finne siste Edge-pakke."
     fi
 }
 
-# Installerer snapd (dersom ikke allerede installert)
 install_snap() {
-    echo "Installerer snapd (dersom ikke allerede installert)..."
-    echo "$password" | sudo -S apt install -y snapd
+    echo "Installerer snapd hvis nødvendig..."
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" snapd
 }
 
-# Installerer apper via Snap
 install_apps_from_app_center() {
-    echo "Installerer apper via Snap:"
-    echo " - IntelliJ IDEA Community..."
-    echo "$password" | sudo -S snap install intellij-idea-community --classic
-    echo " - Android Studio..."
-    echo "$password" | sudo -S snap install android-studio --classic
-    echo " - Discord..."
-    echo "$password" | sudo -S snap install discord
-    echo " - Spotify..."
-    echo "$password" | sudo -S snap install spotify
+    echo "Installerer Snap-applikasjoner..."
+    sudo_pass snap install intellij-idea-community --classic
+    sudo_pass snap install android-studio --classic
+    sudo_pass snap install discord
+    sudo_pass snap install spotify
 }
 
-# Laster ned og installerer Steam
 install_steam() {
-    echo "Laster ned Steam DEB-pakke fra Valve..."
-    wget -O steam_latest.deb "https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
     echo "Installerer Steam..."
-    echo "$password" | sudo -S dpkg -i steam_latest.deb || echo "$password" | sudo -S apt install -f -y
+    wget -qO steam_latest.deb "https://steamcdn-a.akamaihd.net/client/installer/steam.deb"
+    sudo_pass dpkg -i steam_latest.deb || sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" -f
 }
 
 install_wine() {
     echo "Installerer Wine..."
-
-    # Sjekker om Wine allerede er installert
     if dpkg -l | grep -qw wine; then
-        echo "Wine er allerede installert!"
+        echo "Wine er allerede installert."
         return
     fi
-
-    # Legg til Wine PPA repository og oppdater pakker
-    echo "$password" | sudo -S dpkg --add-architecture i386
-    echo "$password" | sudo -S apt update
-    echo "$password" | sudo -S apt install -y wine64 wine32 winetricks
-    echo "Wine er nå installert!"
+    sudo_pass dpkg --add-architecture i386
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" wine64 wine32 winetricks
 }
 
 install_flatpak() {
     echo "Installerer Flatpak..."
-
-    # Sjekk om Flatpak allerede er installert
-    if command -v flatpak &> /dev/null; then
-        echo "Flatpak er allerede installert!"
+    if command -v flatpak &>/dev/null; then
+        echo "Flatpak allerede installert."
         return
     fi
-
-    # Installer Flatpak via APT
-    echo "$password" | sudo -S apt install -y flatpak
-
-    # Legg til Flathub repo hvis det ikke allerede er lagt til
-    echo "$password" | sudo -S flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-    echo "Flatpak er nå installert!"
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" flatpak
+    sudo_pass flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 }
 
 install_gear_lever() {
     echo "Installerer Gear Lever via Flatpak..."
-
-    # Sjekk om Flatpak er installert
-    if ! command -v flatpak &> /dev/null; then
-        echo "Flatpak ble ikke funnet! Installering av Gear Lever kan ikke fortsette."
+    if ! command -v flatpak &>/dev/null; then
+        echo "Flatpak ikke funnet. Avslutter Gear Lever-installasjon."
         return
     fi
-
-    # Legg til Flathub repo hvis det ikke allerede er lagt til
-    echo "$password" | sudo -S flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-    # Installer Gear Lever
-    echo "$password" | sudo -S flatpak install -y flathub com.github.unrud.GearLever
+    sudo_pass flatpak install -y flathub com.github.unrud.GearLever
 }
 
-
-# Installerer rEFInd
 install_refind() {
     echo "Installerer rEFInd..."
-    echo "$password" | sudo -S apt-add-repository ppa:rodsmith/refind -y
-    echo "$password" | sudo -S apt-get update
-    echo "$password" | sudo -S apt-get install -y refind
-    echo "rEFInd er nå installert!"
+    sudo_pass add-apt-repository ppa:rodsmith/refind -y
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    sudo_pass env DEBIAN_FRONTEND=noninteractive apt-get install "${APT_ARGS[@]}" refind
 }
 
-# Henter cooler control-pakker fra GitLab API
 install_cooler_control() {
-    echo "Henter siste versjon fra GitLab API for coolercontrol..."
-    GITLAB_API="https://gitlab.com/api/v4/projects/30707566/releases"
-    LATEST_VERSION=$(curl -s "$GITLAB_API" | jq -r '.[0].tag_name')
-    if [ -z "$LATEST_VERSION" ]; then
-         echo "Kunne ikke finne den nyeste versjonen. Sjekk GitLab API manuelt: $GITLAB_API"
-         exit 1
+    echo "Henter Cooler Control fra GitLab..."
+    local api="https://gitlab.com/api/v4/projects/30707566/releases"
+    local version=$(curl -s "$api" | jq -r '.[0].tag_name')
+    if [[ -z "$version" ]]; then
+        echo "Fant ikke nyeste versjon."
+        exit 1
     fi
-    echo "Nyeste versjon funnet: $LATEST_VERSION"
-    BASE_URL="https://gitlab.com/coolercontrol/coolercontrol/-/releases/$LATEST_VERSION/downloads/packages"
-    PACKAGES=( "coolercontrol_${LATEST_VERSION}_amd64_ubuntu.deb" "coolercontrold_${LATEST_VERSION}_amd64_ubuntu.deb" "coolercontrol-liqctld_${LATEST_VERSION}_amd64_ubuntu.deb" )
-    for PACKAGE in "${PACKAGES[@]}"; do
-         echo "Laster ned $PACKAGE..."
-         wget -O "$PACKAGE" "$BASE_URL/$PACKAGE"
+    echo "Versjon $version funnet. Laster ned pakker..."
+    local base_url="https://gitlab.com/coolercontrol/coolercontrol/-/releases/$version/downloads/packages/"
+    for f in coolercontrol_${version}_amd64_ubuntu.deb \
+             coolercontrold_${version}_amd64_ubuntu.deb \
+             coolercontrol-liqctld_${version}_amd64_ubuntu.deb; do
+        wget -qO "$f" "$base_url$f"
     done
-    echo "Alle cooler control pakkene er lastet ned!"
 }
 
-# Pakker ut coolercontro.tar.gz til /etc/coolercontrol
 extract_coolercontrol() {
-    if [ -f "coolercontro.tar.gz" ]; then
-         echo "Pakker ut coolercontro.tar.gz til /etc/coolercontrol..."
-         echo "$password" | sudo -S mkdir -p /etc/coolercontrol
-         echo "$password" | sudo -S tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol
-         echo "Pakking ferdig!"
+    if [[ -f "coolercontro.tar.gz" ]]; then
+        echo "Pakk ut coolercontro.tar.gz..."
+        sudo_pass mkdir -p /etc/coolercontrol
+        sudo_pass tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol
     else
-         echo "Filen coolercontro.tar.gz ikke funnet. Hoppet over utpakking."
+        echo "coolercontro.tar.gz ikke funnet; hopper over."
     fi
 }
 
-#########################################
-# EKSTRA KONFIGURASJON FOR rEFInd        #
-#########################################
-# Denne funksjonen oppretter tema-mapper, pakker ut ambience.tar.gz,
-# legger til include-erklæring for ambience-theme,
-# og prosesserer linjene med "resolution" i /boot/efi/EFI/refind/refind.conf.
 configure_refind() {
-    CONFIG_DIR="/boot/efi/EFI/refind"
-    CONFIG_FILE="$CONFIG_DIR/refind.conf"
-
-    # Sjekk at rEFInd-mappen finnes
-    if [ ! -d "$CONFIG_DIR" ]; then
-         echo "Mappen $CONFIG_DIR finnes ikke. rEFInd ser ikke ut til å være installert."
-         exit 1
-    fi
-
-    # Lag tema-mappen for ambience
-    echo "Oppretter tema-mappen $CONFIG_DIR/themes/ambience..."
-    echo "$password" | sudo -S mkdir -p "$CONFIG_DIR/themes/ambience"
-
-    # Pakk ut ambience.tar.gz dersom den finnes i den nåværende mappen
-    if [ -f "ambience.tar.gz" ]; then
-         echo "Pakker ut ambience.tar.gz til $CONFIG_DIR/themes/ambience..."
-         echo "$password" | sudo -S tar -xzvf ambience.tar.gz -C "$CONFIG_DIR/themes/ambience"
+    local cfg=/boot/efi/EFI/refind/refind.conf
+    if [[ ! -f "$cfg" ]]; then echo "rEFInd ikke installert."; return; fi
+    echo "Konfigurerer rEFInd-tema og resolution..."
+    sudo_pass mkdir -p /boot/efi/EFI/refind/themes/ambience
+    [[ -f ambience.tar.gz ]] && sudo_pass tar -xzvf ambience.tar.gz -C /boot/efi/EFI/refind/themes/ambience
+    sudo_pass grep -qxF 'include themes/ambience/theme.conf' "$cfg" || \
+        echo 'include themes/ambience/theme.conf' | sudo_pass tee -a "$cfg" >/dev/null
+    mapfile -t lines < <(grep -n '^[[:space:]]*resolution' "$cfg" | grep -v '^[[:space:]]*#' | cut -d: -f1)
+    if (( ${#lines[@]} )); then
+        for ((i=0; i<${#lines[@]}-1; i++)); do
+            sudo_pass sed -i "${lines[i]}s/^/# /" "$cfg"
+        done
+        sudo_pass sed -i "${lines[-1]}a resolution max" "$cfg"
     else
-         echo "Filen ambience.tar.gz ikke funnet. Hoppet over opplasting av theme."
-    fi
-
-    # Legg til include-erklæringen for ambiance-theme til slutt i konfigurasjonsfilen, om den ikke allerede finnes
-    if grep -q "include themes/ambience/theme.conf" "$CONFIG_FILE"; then
-         echo "Include-erklæringen for ambience-theme finnes allerede i $CONFIG_FILE"
-    else
-         echo "Legger til include-erklæring for ambience-theme i $CONFIG_FILE"
-         echo "include themes/ambience/theme.conf" | echo "$password" | sudo -S tee -a "$CONFIG_FILE" >/dev/null
-    fi
-
-    # Hent alle aktive (ikke-kommenterte) resolution-linjer
-    active_lines=( $(grep -n '^[[:space:]]*resolution' "$CONFIG_FILE" | grep -v '^[[:space:]]*#' | cut -d: -f1) )
-
-    if [ ${#active_lines[@]} -gt 0 ]; then
-         echo "Behandler resolution-linjer i $CONFIG_FILE..."
-         # Kommentar ut alle aktive resolution-linjer unntatt den siste
-         for (( i=0; i<${#active_lines[@]}-1; i++ )); do
-              line_num=${active_lines[$i]}
-              echo "$password" | sudo -S sed -i "${line_num}s/^/# /" "$CONFIG_FILE"
-         done
-         # Oppdater siste aktive linje (den skal forbli aktiv) ved å sette inn "resolution max" rett etter
-         last_line=${active_lines[-1]}
-         echo "$password" | sudo -S sed -i "${last_line}a resolution max" "$CONFIG_FILE"
-    else
-         echo "Ingen aktive resolution-linjer funnet. Legger til \"resolution max\" på slutten av $CONFIG_FILE."
-         echo "resolution max" | echo "$password" | sudo -S tee -a "$CONFIG_FILE" >/dev/null
+        echo 'resolution max' | sudo_pass tee -a "$cfg" >/dev/null
     fi
 }
 
 configure_theme() {
-    CONFIG_FILE="gnome-settings.dconf"
-    if [ -f "$CONFIG_FILE" ]; then
-        echo "Laster inn GNOME-innstillinger fra $CONFIG_FILE..."
-        dconf load / < "$CONFIG_FILE"
-    else
-        echo "Feil: Filen $CONFIG_FILE ble ikke funnet."
-    fi
+    local f=gnome-settings.dconf
+    [[ -f "$f" ]] && dconf load / < "$f"
 }
 
 configure_extensions() {
-    BACKUP_FILE="gnome-extensions-backup.tar.gz"
-    EXT_DIR="$HOME/.local/share/gnome-shell/extensions"
-    
-    if [ -f "$BACKUP_FILE" ]; then
-        echo "Oppretter mappen $EXT_DIR hvis den ikke finnes..."
-        mkdir -p "$EXT_DIR"
-        
-        echo "Pakker ut GNOME-extensions fra $BACKUP_FILE..."
-        tar -xvzf "$BACKUP_FILE" -C "$EXT_DIR"
+    local b=gnome-extensions-backup.tar.gz
+    local d="$HOME/.local/share/gnome-shell/extensions"
+    if [[ -f "$b" ]]; then
+        mkdir -p "$d"
+        tar -xzf "$b" -C "$d"
         dconf load /org/gnome/shell/extensions/ < gnome-extensions-settings.dconf
-
-    else
-        echo "Feil: Filen $BACKUP_FILE ble ikke funnet."
     fi
 }
 
-#####################
-# HOVEDFUNKSJONEN  #
-#####################
 main() {
-    install_dependencies  # Installerer nødvendige pakker først
-
-    # Kloner repository dersom den ikke allerede eksisterer, og bytt til mappen
-    if [ ! -d "machinesetup" ]; then
-         echo "Kloner repository..."
-         git clone https://github.com/bskjon/machinesetup.git
-         cd machinesetup
-    else
-         cd machinesetup
+    install_dependencies
+    if [[ ! -d machinesetup ]]; then
+        git clone https://github.com/bskjon/machinesetup.git
     fi
+    cd machinesetup
 
     install_fzf
     install_edge
@@ -285,16 +186,13 @@ main() {
     install_wine
     install_flatpak
     install_gear_lever
-    # Konfigurer rEFInd med tema og resolution-oppdateringer
     configure_refind
-
     install_cooler_control
     extract_coolercontrol
-
     configure_theme
     configure_extensions
 
-    echo "Alle installasjoner og konfigurasjoner er fullført!"
+    echo "*** All installasjoner og konfigurasjoner fullført! ***"
 }
 
 main
