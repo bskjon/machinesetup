@@ -216,7 +216,7 @@ configure_refind() {
          echo "Include-erklæringen for ambience-theme finnes allerede i $CONFIG_FILE"
     else
          echo "Legger til include-erklæring for ambience-theme i $CONFIG_FILE"
-         echo "include themes/ambience/theme.conf" | echo "$password" | sudo -S tee -a "$CONFIG_FILE" >/dev/null
+         echo "$password" | sudo -S tee -a "$CONFIG_FILE" <<< "include themes/ambience/theme.conf" >/dev/null
     fi
 
     # Hent alle aktive (ikke-kommenterte) resolution-linjer
@@ -234,7 +234,7 @@ configure_refind() {
          echo "$password" | sudo -S sed -i "${last_line}a resolution max" "$CONFIG_FILE"
     else
          echo "Ingen aktive resolution-linjer funnet. Legger til \"resolution max\" på slutten av $CONFIG_FILE."
-         echo "resolution max" | echo "$password" | sudo -S tee -a "$CONFIG_FILE" >/dev/null
+         echo "$password" | sudo -S tee -a "$CONFIG_FILE" <<< "resolution max" >/dev/null
     fi
 }
 
