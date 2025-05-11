@@ -7,7 +7,7 @@ Dette skriptet automatiserer installasjonen av flere programmer og verktøy på 
 For å kjøre dette installasjonsskriptet, bruk følgende kommando i terminalen:
 
 ```bash
-bash -c "$(wget -qO- https://raw.githubusercontent.com/bskjon/machinesetup/main/install.sh)"
+bash -c "$(wget -qO- https://raw.githubusercontent.com/bskjon/machinesetup/refs/heads/master/install.sh)"
 ```
 Funksjoner
 Skriptet inneholder følgende installasjoner:
