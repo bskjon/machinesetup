@@ -35,10 +35,8 @@ install_dependencies() {
 # Installerer fzf og legger til initialisering i .bashrc
 install_fzf() {
     echo "Installerer fzf..."
-    echo "$password" | sudo -S apt install -y fzf
-    if ! grep -q 'fzf --bash' "$HOME/.bashrc"; then
-        echo 'eval "$(fzf --bash)"' >> "$HOME/.bashrc"
-    fi
+    git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+    ~/.fzf/install --all
 }
 
 # Installerer Microsoft Edge ved å hente den siste .deb-filen
