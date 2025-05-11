@@ -157,17 +157,26 @@ install_cooler_control() {
     echo "Nyeste versjon funnet: $LATEST_VERSION"
     BASE_URL="https://gitlab.com/coolercontrol/coolercontrol/-/releases/$LATEST_VERSION/downloads/packages"
     PACKAGES=( "coolercontrol_${LATEST_VERSION}_amd64_ubuntu.deb" "coolercontrold_${LATEST_VERSION}_amd64_ubuntu.deb" "coolercontrol-liqctld_${LATEST_VERSION}_amd64_ubuntu.deb" )
+
     for PACKAGE in "${PACKAGES[@]}"; do
          echo "Laster ned $PACKAGE..."
          wget -O "$PACKAGE" "$BASE_URL/$PACKAGE"
+
+         echo "Installerer $PACKAGE..."
+         # Forsøk å installere pakken 
+         if ! echo "$password" | sudo -S dpkg -i "$PACKAGE"; then
+             # Dersom installasjonen mislykkes pga. av manglende avhengigheter, fiks dem:
+             echo "$password" | sudo -S apt-get -f install -y
+         fi
     done
-    echo "Alle cooler control pakkene er lastet ned!"
+    echo "Alle cooler control pakkene er lastet ned og installert!"
 }
+
 
 # Pakker ut coolercontro.tar.gz til /etc/coolercontrol
 extract_coolercontrol() {
-    if [ -f "coolercontro.tar.gz" ]; then
-         echo "Pakker ut coolercontro.tar.gz til /etc/coolercontrol..."
+    if [ -f "coolercontrol.tar.gz" ]; then
+         echo "Pakker ut coolercontrol.tar.gz til /etc/coolercontrol..."
          echo "$password" | sudo -S mkdir -p /etc/coolercontrol
          echo "$password" | sudo -S tar -xzvf coolercontro.tar.gz -C /etc/coolercontrol
          echo "Pakking ferdig!"
